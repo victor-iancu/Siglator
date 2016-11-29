@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog
 from os import listdir, path, chdir
-from PIL import Image
+from PIL import Image, ImageChops
 from colorthief import ColorThief
+from io import BytesIO
 
 class AppInterface(tk.Frame):
 
@@ -79,80 +80,112 @@ class AppInterface(tk.Frame):
 
             return (int(r_average), int(g_average), int(b_average), int(a_average))
 
+    def verify_color(self, section_rgb, logo_rgb):
+        section_r, section_g, section_b = section_rgb
+        logo_r, logo_g, logo_b = logo_rgb
+
+        for index in range(3):
+            if(abs(section_rgb[index] - logo_rgb[index]) >= 60):
+                return True
+
+        if abs(section_r - section_g) >= 30 and abs(section_r - section_b) >=30:
+            return True
+
+        if abs(section_r - section_b) >= 30 and abs(section_r - section_g) >=30:
+            return True
+
+        if abs(section_g - section_b) >= 30 and abs(section_g - section_r) >=30:
+            return True
+
+        return False
+
     def process_images(self):
 
         #open the selected logo
         logo = Image.open(self.logoPath)
 
-        #open the current image
-        im = Image.open(self.images[0])
+        for image in self.images:
+            #open the current image
+            im = Image.open(image)
 
-        #get and store current image's width and height
-        image_width, image_height = im.size[0], im.size[1]
+            #get and store current image's width and height
+            image_width, image_height = im.size[0], im.size[1]
 
-        #set logo's width and height pixel beginning points
-        image_width_begin_pixel = int(image_width * 70 / 100)
-        image_height_begin_pixel = int(image_height * 70 / 100)
+            #set logo's width and height pixel beginning points
+            image_width_begin_pixel = int(image_width * 70 / 100)
+            image_height_begin_pixel = int(image_height * 70 / 100)
 
-        # set logo's width and height pixel ending points
-        image_width_end_pixel = int(image_width * 3 / 100)
-        image_height_end_pixel = int(image_height * 3 / 100)
-
-
-        #size to scale the logo to
-        max_logo_size = (image_width - image_width_begin_pixel - image_width_end_pixel, image_height - image_height_begin_pixel - image_height_end_pixel)
-
-        #scale logo
-        logo.thumbnail(max_logo_size, Image.ANTIALIAS)
-
-        #get width and height for the scaled logo
-        logo_width, logo_height = logo.size[0], logo.size[1]
-
-        #setting the "section" of the image where the logo will be pasted in
-        #(starting width pixel, starting height pixel)
-        #a.k.a logo's top left corner
-        box = (image_width - logo_width - image_width_end_pixel, image_height - logo_height - image_height_end_pixel)
-
-        #santier
+            # set logo's width and height pixel ending points
+            image_width_end_pixel = int(image_width * 3 / 100)
+            image_height_end_pixel = int(image_height * 3 / 100)
 
 
-        temp_box = (image_width - logo_width - image_width_end_pixel,
-                    image_height - logo_height - image_height_end_pixel,
-                    image_width - image_width_end_pixel,
-                    image_height - image_height_end_pixel )
-        section = im.crop(temp_box)
+            #size to scale the logo to
+            max_logo_size = (image_width - image_width_begin_pixel - image_width_end_pixel, image_height - image_height_begin_pixel - image_height_end_pixel)
 
-        print("Current photo mode: ", logo.mode)
-        r, g, b = self.get_dominant_color(section)
-        print("Dominant RGB for section -> R:",r ," G: ", g," B: ", b)
+            #scale logo
+            logo.thumbnail(max_logo_size, Image.ANTIALIAS)
 
-        ct = ColorThief(self.logoPath)
-        print("Logo mode: ", logo.mode)
-        r, g, b = ct.get_color()
-        print("Dominant RGB for logo -> R:", r, " G: ", g, " B: ", b)
+            #get width and height for the scaled logo
+            logo_width, logo_height = logo.size[0], logo.size[1]
 
-        #ct = ColorThief(self.logoPath)
-        #print(ct.get_color())
+            #setting the "section" of the image where the logo will be pasted in
+            #(starting width pixel, starting height pixel)
+            #a.k.a logo's top left corner
+            box = (image_width - logo_width - image_width_end_pixel, image_height - logo_height - image_height_end_pixel)
 
-        section.show()
+            #santier
 
-        #color_thief = ColorThief(self.images[0])
-        #print(color_thief.get_color(quality=1))
-        #print(color_thief.get_palette(color_count=10))
+            temp_box = (image_width - logo_width - image_width_end_pixel,
+                        image_height - logo_height - image_height_end_pixel,
+                        image_width - image_width_end_pixel,
+                        image_height - image_height_end_pixel )
+            section = im.crop(temp_box)
+
+            bytesIO = BytesIO()
+            section.save(bytesIO, 'JPEG')
+            bytesIO.seek(0)
+
+            #get image section's 4 most frequent colors
+            ct = ColorThief(bytesIO)
+            #spot_dominant_colors = ct.get_palette(color_count=2)
+            spot_dominant_color = ct.get_color(quality=5)
+            bytesIO.close()
+
+            #get logo's 4 most frequent colors
+            ct2 = ColorThief(self.logoPath)
+            #logo_dominant_colors = ct2.get_palette(color_count=2)
+            logo_dominant_color = ct2.get_color(quality=5)
+
+            print("Spot dominant color: ", spot_dominant_color)
+            #print("Spot secondary colors: ", spot_dominant_colors)
+            print("Logo dominant color: ", logo_dominant_color)
+            #print("Logo secondary colors: ", logo_dominant_colors)
+
+            if self.verify_color(spot_dominant_color, logo_dominant_color):
+                print("Logo is good to be applied bottom-right!")
+            else:
+                print("NOT a good position for the logo at bottom-right!")
+
+            #section.show()
+
+            #color_thief = ColorThief(self.images[0])
+            #print(color_thief.get_color(quality=1))
+            #print(color_thief.get_palette(color_count=10))
 
 
 
-        #end of santier
+            #end of santier
 
 
-        #load the logo in order to be able to paste it
-        logo.load()
+            #load the logo in order to be able to paste it
+            logo.load()
 
-        #paste the logo over the current image in the "box"
-        im.paste(logo, box, mask=logo.split()[3])
+            #paste the logo over the current image in the "box"
+            im.paste(logo, box, mask=logo.split()[3])
 
 
-        im.show()
+            im.show()
 
 
 
