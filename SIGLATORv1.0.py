@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 from os import listdir, path, chdir
 from PIL import Image
+from colorthief import ColorThief
 
 class AppInterface(tk.Frame):
 
@@ -46,19 +47,111 @@ class AppInterface(tk.Frame):
             if ext.lower() in validImages:
                 self.images.append(path.abspath(file))
 
+    def get_dominant_color(self, image):
+        width, height = image.size
+        r_average = 0
+        g_average = 0
+        b_average = 0
+
+        for x in range(0, width):
+            for y in range(0, height):
+                r, g, b = image.getpixel((x, y))
+                r_average = (r + r_average) / 2
+                g_average = (g + g_average) / 2
+                b_average = (b + b_average) / 2
+
+        return (int(r_average), int(g_average), int(b_average))
+
+    def get_logo_dominant_color(self, image):
+            width, height = image.size
+            r_average = 0
+            g_average = 0
+            b_average = 0
+            a_average = 0
+
+            for x in range(0, width):
+                for y in range(0, height):
+                    r, g, b, a = image.getpixel((x, y))
+                    r_average = (r + r_average) / 2
+                    g_average = (g + g_average) / 2
+                    b_average = (b + b_average) / 2
+                    a_average = (a + a_average) / 2
+
+            return (int(r_average), int(g_average), int(b_average), int(a_average))
+
     def process_images(self):
 
-        self.logo = Image.open(self.logoPath)
-        logo_width, logo_height = self.logo.size[0], self.logo.size[1]
+        #open the selected logo
+        logo = Image.open(self.logoPath)
 
+        #open the current image
         im = Image.open(self.images[0])
-        print(im.size, im.format)
+
+        #get and store current image's width and height
         image_width, image_height = im.size[0], im.size[1]
 
-        box = (image_width - logo_width, image_height - logo_height, image_width, image_height)
+        #set logo's width and height pixel beginning points
+        image_width_begin_pixel = int(image_width * 70 / 100)
+        image_height_begin_pixel = int(image_height * 70 / 100)
 
-        self.logo.load()
-        im.paste(self.logo, box, mask=self.logo.split()[3])
+        # set logo's width and height pixel ending points
+        image_width_end_pixel = int(image_width * 3 / 100)
+        image_height_end_pixel = int(image_height * 3 / 100)
+
+
+        #size to scale the logo to
+        max_logo_size = (image_width - image_width_begin_pixel - image_width_end_pixel, image_height - image_height_begin_pixel - image_height_end_pixel)
+
+        #scale logo
+        logo.thumbnail(max_logo_size, Image.ANTIALIAS)
+
+        #get width and height for the scaled logo
+        logo_width, logo_height = logo.size[0], logo.size[1]
+
+        #setting the "section" of the image where the logo will be pasted in
+        #(starting width pixel, starting height pixel)
+        #a.k.a logo's top left corner
+        box = (image_width - logo_width - image_width_end_pixel, image_height - logo_height - image_height_end_pixel)
+
+        #santier
+
+
+        temp_box = (image_width - logo_width - image_width_end_pixel,
+                    image_height - logo_height - image_height_end_pixel,
+                    image_width - image_width_end_pixel,
+                    image_height - image_height_end_pixel )
+        section = im.crop(temp_box)
+
+        print("Current photo mode: ", logo.mode)
+        r, g, b = self.get_dominant_color(section)
+        print("Dominant RGB for section -> R:",r ," G: ", g," B: ", b)
+
+        ct = ColorThief(self.logoPath)
+        print("Logo mode: ", logo.mode)
+        r, g, b = ct.get_color()
+        print("Dominant RGB for logo -> R:", r, " G: ", g, " B: ", b)
+
+        #ct = ColorThief(self.logoPath)
+        #print(ct.get_color())
+
+        section.show()
+
+        #color_thief = ColorThief(self.images[0])
+        #print(color_thief.get_color(quality=1))
+        #print(color_thief.get_palette(color_count=10))
+
+
+
+        #end of santier
+
+
+        #load the logo in order to be able to paste it
+        logo.load()
+
+        #paste the logo over the current image in the "box"
+        im.paste(logo, box, mask=logo.split()[3])
+
+
         im.show()
 
 
@@ -76,3 +169,19 @@ def main():
     app.mainloop()
 
 main()
+
+
+''' code dump
+        #print("Logo width:",logo_width, "Logo height: ", logo_height)
+        #print("Future width: ", image_width - logo_width - i_width_out)
+        #print("future height: ", image_height - logo_height - i_height_out)
+        #box = (image_width - logo_width, image_height - logo_height, image_width, image_height)
+        #box = (image_width - logo_width - i_width_out, image_height - logo_height - i_height_out, i_width_out, i_height_out)
+
+        #print("Box width in: ", image_width - logo_width - i_width_out)
+        #print("Box height in: ", image_height - logo_height - i_height_out)
+        #print("Box width out: ", i_width_out)
+        #print("Box height out: ", i_height_out)
+        #print("Height size: ", image_height - (image_height - logo_height - i_height_out) - i_height_out)
+        #print("Width size: ", image_width - (image_width - logo_width - i_width_out) - i_width_out)
+'''
