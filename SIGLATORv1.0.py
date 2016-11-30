@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog
 from os import listdir, path, chdir
-from PIL import Image, ImageChops
+from PIL import Image
 from colorthief import ColorThief
 from io import BytesIO
 
