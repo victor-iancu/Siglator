@@ -1,6 +1,7 @@
 # Siglator
 
-Installation.
+Installation:
+
 1. Download and Install Python 3.x + (Version 3.5.2 download: https://www.python.org/downloads/release/python-352/).
   1.1. Select all the Optional Features during install (pip, tk, etc..).
   1.2. Make sure Python is added to the PATH variable.
