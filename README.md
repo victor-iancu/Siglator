@@ -1,6 +1,6 @@
 # Siglator
 
-Installation:
+###Installation:
 
 1. Download and Install Python 3.x + (Version 3.5.2 download: https://www.python.org/downloads/release/python-352/):
   1. Select all the Optional Features during install (pip, tk, etc..).
@@ -19,7 +19,7 @@ Installation:
   2. Get Pillow (image library): "pip install Pillow". 
   3. Get Color-Thief: "pip install colorthief". 
   
-Usage:
+###Usage:
 
 1. Select the folder which contains the images. Press "Choose a folder" button.
 2. Select the logo to be applied on all images. Press "Choose a logo" button.
