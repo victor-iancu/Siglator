@@ -189,3 +189,4 @@ def test_apply_logo(images_paths, logo_path, save_directory):
 
     for image_path in images_paths:
         image_process(image_path, logo_path, save_directory, logo_dominant_color, logo_priority)
+        
