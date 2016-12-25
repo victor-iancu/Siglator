@@ -35,7 +35,7 @@ def verify_compatibility(section, logo_dominant_color, accuracy=5):
 
 def verify_color(section_dominant_color, logo_dominant_color):
     section_r, section_g, section_b = section_dominant_color
-    print("Logo dom color: ", logo_dominant_color)
+    #print("Logo dom color: ", logo_dominant_color)
     for index in range(3):
         if (abs(section_dominant_color[index] - logo_dominant_color[index]) >= 60):
             return True
@@ -53,14 +53,12 @@ def verify_color(section_dominant_color, logo_dominant_color):
 
 
 class Photo:
-    logo_dominant_color = multiprocessing.Array('i',[0,0,0])
+    logo_cache = {}
+
     def __init__(self, image_path, logo_path):
         self.image_path = image_path
         self.image = Image.open(image_path)
-        self.logo = Image.open(logo_path)
         self.width, self.height = self.image.size
-
-        #print("New image")
 
         # set logo's width and height pixel beginning points
         self.section_left_offset = int(self.width * 70 / 100)
@@ -74,8 +72,24 @@ class Photo:
         logo_scale_box = (self.width - self.section_left_offset - self.section_right_offset,
                           self.height - self.section_top_offset - self.section_bottom_offset)
 
+        if (self.width,self.height) not in Photo.logo_cache:
+            print("Not in cache: ",self.width, self.width)
+            self.logo = Image.open(logo_path)
+
+            # scale logo
+            self.logo.thumbnail(logo_scale_box, Image.ANTIALIAS)
+
+            # cache
+            Photo.logo_cache.update({(self.width,self.height): self.logo})
+        else:
+            print("In cache: ", self.width, self.height)
+            self.logo = Photo.logo_cache[(self.width, self.height)]
+
+        '''self.logo = Image.open(logo_path)
+
         # scale logo
-        self.logo.thumbnail(logo_scale_box, Image.ANTIALIAS)
+        self.logo.thumbnail(logo_scale_box, Image.ANTIALIAS)'''
+
 
         # scaled logo dimensions
         self.scaled_logo_width, self.scaled_logo_height = self.logo.size
@@ -151,10 +165,10 @@ def image_process(image_path, logo_path, save_directory, logo_dominant_color, lo
     for i in logo_priority:
         section = image.logo_pos_index[i]()
         if verify_compatibility(section, logo_dominant_color):
-            print("Before apply logo")
+            #print("Before apply logo")
             image.apply_logo()
             save_image(image, save_directory)
-            print("Image saved!")
+            #print("Image saved!")
             break
 
 

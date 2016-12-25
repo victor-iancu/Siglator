@@ -4,7 +4,9 @@ import threading
 import time
 import cProfile
 from tkinter import filedialog, messagebox, ttk
-from os import listdir, path, chdir, makedirs
+from os import listdir, path, chdir
+from distutils.core import setup
+import multiprocessing
 
 
 def is_image(image_path):
@@ -52,8 +54,8 @@ class AddLogoThread(threading.Thread):
         start_time = time.time()
         imgModule.apply_logo(self.images_paths, self.logo_path, self.save_directory + "/SIGLATOR Results")
 
-        '''
-        --- cProfile ---
+
+        '''#--- cProfile ---
         fileName = "test.txt"
         cProfile.runctx("imgModule.test_apply_logo(img,logo,dir)", globals(),
                         {
@@ -61,8 +63,8 @@ class AddLogoThread(threading.Thread):
                             'logo': self.logo_path,
                             'dir': self.save_directory + "/SIGLATOR Results"
                         },
-                        fileName)
-        '''
+                        fileName)'''
+
 
         end_time = time.time()
         print("Duration: ",end_time - start_time)
@@ -116,10 +118,10 @@ class AppInterface(tk.Frame):
             messagebox.showinfo("Info", "No directory chosen")
         else:
             # display directory name
-            gui.directory_text.config(state=tk.NORMAL)
-            gui.directory_text.delete(1.0, tk.END)
-            gui.directory_text.insert(tk.END, self.directory_path)
-            gui.directory_text.config(state=tk.DISABLED)
+            self.directory_text.config(state=tk.NORMAL)
+            self.directory_text.delete(1.0, tk.END)
+            self.directory_text.insert(tk.END, self.directory_path)
+            self.directory_text.config(state=tk.DISABLED)
             folder_thread = FolderThread(self.directory_path)
             folder_thread.start()
 
@@ -129,16 +131,17 @@ class AppInterface(tk.Frame):
             messagebox.showwarning("Warning", "Chosen file is not an image!")
         else:
             # display chosen logo
-            gui.logo_text.config(state=tk.NORMAL)
-            gui.logo_text.delete(1.0, tk.END)
-            gui.logo_text.insert(tk.END, path.split(gui.logo_path)[1])
-            gui.logo_text.config(state=tk.DISABLED)
+            self.logo_text.config(state=tk.NORMAL)
+            self.logo_text.delete(1.0, tk.END)
+            self.logo_text.insert(tk.END, path.split(self.logo_path)[1])
+            self.logo_text.config(state=tk.DISABLED)
 
     def add_logo(self):
         add_logo_thread = AddLogoThread(self.images, self.logo_path, self.directory_path)
         add_logo_thread.start()
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     root = tk.Tk()
     gui = AppInterface(master=root)
     gui.mainloop()
