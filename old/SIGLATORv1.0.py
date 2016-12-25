@@ -247,6 +247,7 @@ class AppInterface(tk.Frame):
 
         return False
 
+    
     def paste_logo(self, im):
         # get and store current image's width and height
         image_width, image_height = im.size
