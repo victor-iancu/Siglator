@@ -1,3 +1,4 @@
+#!python3
 import images as imgModule
 import tkinter as tk
 import threading

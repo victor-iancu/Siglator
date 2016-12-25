@@ -15,9 +15,8 @@
     5. Check again if pip is installed: "pip -V".
     6. Update pip to the latest version: "python -m pip install -U pip".
 2. Get the external dependenices for the script to work.
-  1. Open CMD (anywhere) as Administrator.
-  2. Get Pillow (image library): "pip install Pillow". 
-  3. Get Color-Thief: "pip install colorthief". 
+  1. Open CMD in the project folder.
+  2. Install dependencies: "pip install -r requirements.txt".
   
 ###Usage:
 
