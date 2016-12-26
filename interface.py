@@ -43,17 +43,19 @@ class FolderThread(threading.Thread):
 
 
 class AddLogoThread(threading.Thread):
-    def __init__(self, images_paths, logo_path, save_directory):
+    def __init__(self, images_paths, logo_path, save_directory, logo_priority):
         threading.Thread.__init__(self)
         self.daemon = True
         self.images_paths = images_paths
         self.logo_path = logo_path
-        self.save_directory = save_directory
+        self.save_directory = save_directory + "/SIGLATOR Results"
+        self.logo_priority = logo_priority
 
     def run(self):
         print("Started AddLogoThread ")
         start_time = time.time()
-        imgModule.apply_logo(self.images_paths, self.logo_path, self.save_directory + "/SIGLATOR Results")
+        imgModule.apply_logo(self.images_paths, self.logo_path,
+                             self.save_directory, self.logo_priority )
 
 
         '''#--- cProfile ---
@@ -72,14 +74,43 @@ class AddLogoThread(threading.Thread):
         print("Finished AddLogoThread ")
 
 
+class DDList(tk.Listbox):
+    """ A Tkinter listbox with drag'n'drop reordering of entries. """
+    def __init__(self, master, **kw):
+        kw['selectmode'] = tk.EXTENDED
+        kw['activestyle'] = tk.NONE
+        tk.Listbox.__init__(self, master, kw)
+        self.bind('<Button-1>', self.setCurrent)
+        self.bind('<B1-Motion>', self.shiftSelection)
+        self.curIndex = None
+    def setCurrent(self, event):
+        self.curIndex = self.nearest(event.y)
+    def shiftSelection(self, event):
+        i = self.nearest(event.y)
+        if i < self.curIndex:
+            x = self.get(i)
+            self.delete(i)
+            self.insert(i+1, x)
+            self.curIndex = i
+        elif i > self.curIndex:
+            x = self.get(i)
+            self.delete(i)
+            self.insert(i-1, x)
+            self.curIndex = i
+
+
 class AppInterface(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        # inits
+        #inits
         self.directory_path = None
         self.logo_path = None
         self.images = []
-        # drawing the interface
+        self.priority_dict = {"Bottom right": 1,
+                              "Bottom left": 2,
+                              "Top right": 3,
+                              "Top left": 4}
+        #drawing the interface
         self.pack()
         self.create_widgets()
 
@@ -103,6 +134,13 @@ class AppInterface(tk.Frame):
         self.logo_text.insert(tk.END, "No chosen logo...")
         self.logo_text.config(state=tk.DISABLED, height=1)
         self.logo_text.grid(row=1, column=1, padx=2, pady=1)
+
+        self.listbox = DDList(self)
+        self.listbox.grid(row=2, column=0)
+
+        #init listbox
+        for item in ["Bottom right", "Bottom left", "Top right", "Top left"]:
+            self.listbox.insert(tk.END, item)
 
         self.add_logo_btn = tk.Button(self)
         self.add_logo_btn["text"] = "Add Logo"
@@ -138,7 +176,9 @@ class AppInterface(tk.Frame):
             self.logo_text.config(state=tk.DISABLED)
 
     def add_logo(self):
-        add_logo_thread = AddLogoThread(self.images, self.logo_path, self.directory_path)
+        logo_priority = list(map((lambda item: self.priority_dict[item]),self.listbox.get(0, tk.END)))
+        print(logo_priority)
+        add_logo_thread = AddLogoThread(self.images, self.logo_path, self.directory_path, logo_priority)
         add_logo_thread.start()
 
 if __name__ == "__main__":

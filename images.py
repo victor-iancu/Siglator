@@ -85,12 +85,6 @@ class Photo:
             print("In cache: ", self.width, self.height)
             self.logo = Photo.logo_cache[(self.width, self.height)]
 
-        '''self.logo = Image.open(logo_path)
-
-        # scale logo
-        self.logo.thumbnail(logo_scale_box, Image.ANTIALIAS)'''
-
-
         # scaled logo dimensions
         self.scaled_logo_width, self.scaled_logo_height = self.logo.size
 
@@ -165,23 +159,21 @@ def image_process(image_path, logo_path, save_directory, logo_dominant_color, lo
     for i in logo_priority:
         section = image.logo_pos_index[i]()
         if verify_compatibility(section, logo_dominant_color):
-            #print("Before apply logo")
             image.apply_logo()
             save_image(image, save_directory)
-            #print("Image saved!")
             break
 
 
-def apply_logo(images_paths, logo_path, save_directory):
+def apply_logo(images_paths, logo_path, save_directory, logo_priority):
     try:
         makedirs(save_directory, exist_ok=True)
     except:
         print("Couldn't create the directory!")
 
     logo_dominant_color = get_dominant_color(logo_path)
-    logo_priority = [1, 2, 3, 4]
+    #logo_priority = [1, 2, 3, 4]
 
-    arguments = []
+    arguments = [] 
     for image_path in images_paths:
         arguments.append((image_path, logo_path, save_directory, logo_dominant_color, logo_priority))
 
