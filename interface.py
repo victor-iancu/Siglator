@@ -6,6 +6,7 @@ import time
 import cProfile
 from tkinter import filedialog, messagebox, ttk
 from os import listdir, path, chdir
+from PIL import Image, ImageTk as ImgTk
 from distutils.core import setup
 import multiprocessing
 
@@ -37,7 +38,7 @@ class FolderThread(threading.Thread):
 
     def run(self):
         print("Started FolderThread ")
-        # get files from directory
+        #get files from directory
         get_images(self.directory_path)
         print("Finished FolderThread ")
 
@@ -57,8 +58,8 @@ class AddLogoThread(threading.Thread):
         imgModule.apply_logo(self.images_paths, self.logo_path,
                              self.save_directory, self.logo_priority )
 
-
-        '''#--- cProfile ---
+        #cProfile
+        '''
         fileName = "test.txt"
         cProfile.runctx("imgModule.test_apply_logo(img,logo,dir)", globals(),
                         {
@@ -66,12 +67,28 @@ class AddLogoThread(threading.Thread):
                             'logo': self.logo_path,
                             'dir': self.save_directory + "/SIGLATOR Results"
                         },
-                        fileName)'''
-
+                        fileName)
+        '''
 
         end_time = time.time()
         print("Duration: ",end_time - start_time)
         print("Finished AddLogoThread ")
+
+
+class PreviewThread(threading.Thread):
+    def __init__(self, images_paths, logo_path, logo_priority, current_photo):
+        threading.Thread.__init__(self)
+        self.images_paths = images_paths
+        self.logo_path = logo_path
+        self.logo_priority = logo_priority
+        self.current_photo = current_photo
+
+    def run(self):
+        print("Started PreviewThread ")
+        image = imgModule.preview_images(self.images_paths, self.logo_path,
+                                 self.logo_priority, self.current_photo)
+        gui.display_new_image(image)
+        print("Finished PreviewThread ")
 
 
 class DDList(tk.Listbox):
@@ -102,6 +119,7 @@ class DDList(tk.Listbox):
 class AppInterface(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+
         #inits
         self.directory_path = None
         self.logo_path = None
@@ -110,6 +128,9 @@ class AppInterface(tk.Frame):
                               "Bottom left": 2,
                               "Top right": 3,
                               "Top left": 4}
+        self.current_photo_index = 0
+        self.current_photo = None
+
         #drawing the interface
         self.pack()
         self.create_widgets()
@@ -145,18 +166,32 @@ class AppInterface(tk.Frame):
         self.add_logo_btn = tk.Button(self)
         self.add_logo_btn["text"] = "Add Logo"
         self.add_logo_btn["command"] = self.add_logo
-        self.add_logo_btn.config(state=tk.NORMAL)
-        self.add_logo_btn.grid(row=4, columnspan=2, pady=10)
+        self.add_logo_btn.grid(row=4, column=0, pady=10)
+
+        self.preview_btn = tk.Button(self)
+        self.preview_btn["text"] = "Preview"
+        self.preview_btn["command"] = self.preview
+        self.preview_btn.grid(row=4, column=1)
 
         self.image_preview_canvas = tk.Canvas(self, width=0, height=0)
         self.image_preview_canvas.grid(row=5, columnspan=2)
+
+        self.previous_btn = tk.Button(self)
+        self.previous_btn["text"] = "Prev"
+        self.previous_btn["command"] = self.previous
+        self.previous_btn.grid(row=6, column=0)
+
+        self.next_btn = tk.Button(self)
+        self.next_btn["text"] = "Next"
+        self.next_btn["command"] = self.next
+        self.next_btn.grid(row=6, column=1)
 
     def open_folder(self):
         self.directory_path = tk.filedialog.askdirectory()
         if not self.directory_path:
             messagebox.showinfo("Info", "No directory chosen")
         else:
-            # display directory name
+            #display directory name
             self.directory_text.config(state=tk.NORMAL)
             self.directory_text.delete(1.0, tk.END)
             self.directory_text.insert(tk.END, self.directory_path)
@@ -169,7 +204,7 @@ class AppInterface(tk.Frame):
         if not is_image(self.logo_path):
             messagebox.showwarning("Warning", "Chosen file is not an image!")
         else:
-            # display chosen logo
+            #display chosen logo
             self.logo_text.config(state=tk.NORMAL)
             self.logo_text.delete(1.0, tk.END)
             self.logo_text.insert(tk.END, path.split(self.logo_path)[1])
@@ -177,12 +212,47 @@ class AppInterface(tk.Frame):
 
     def add_logo(self):
         logo_priority = list(map((lambda item: self.priority_dict[item]),self.listbox.get(0, tk.END)))
-        print(logo_priority)
         add_logo_thread = AddLogoThread(self.images, self.logo_path, self.directory_path, logo_priority)
         add_logo_thread.start()
+
+    def preview(self):
+        #self.image_preview_canvas.delete("all")
+        self.image_preview_canvas.create_text(480, 270, text="Loading...", font=("Purisa",50), fill="orange")
+
+        logo_priority = list(map((lambda item: self.priority_dict[item]), self.listbox.get(0, tk.END)))
+        preview_thread = PreviewThread(self.images, self.logo_path, logo_priority, self.current_photo_index)
+        preview_thread.start()
+
+    def display_new_image(self, image):
+        self.current_photo = ImgTk.PhotoImage(image)
+        self.image_preview_canvas.delete("all")
+        self.image_preview_canvas.config(width=960, height=540)
+        self.image_preview_canvas.create_image(480, 270, image=self.current_photo)
+
+    def previous(self):
+        try:
+            if self.current_photo_index == 0:
+                self.current_photo_index = len(self.images) - 1
+            else:
+                self.current_photo_index -= 1
+            self.preview()
+        except:
+            print("Can't get previous photo")
+
+    def next(self):
+        try:
+            if self.current_photo_index == len(self.images) - 1:
+                self.current_photo_index = 0
+            else:
+                self.current_photo_index += 1
+            self.preview()
+        except:
+            print("Can't get next photo")
+
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     root = tk.Tk()
+    root.wm_title("Siglator")
     gui = AppInterface(master=root)
     gui.mainloop()

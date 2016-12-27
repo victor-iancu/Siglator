@@ -55,9 +55,13 @@ def verify_color(section_dominant_color, logo_dominant_color):
 class Photo:
     logo_cache = {}
 
-    def __init__(self, image_path, logo_path):
+    def __init__(self, image_path, logo_path, rescale_factor=None):
         self.image_path = image_path
         self.image = Image.open(image_path)
+
+        if rescale_factor:
+            self.image.thumbnail(rescale_factor, Image.ANTIALIAS)
+
         self.width, self.height = self.image.size
 
         # set logo's width and height pixel beginning points
@@ -93,6 +97,12 @@ class Photo:
                                2: self.get_bottom_left_corner,
                                3: self.get_top_right_corner,
                                4: self.get_top_left_corner}
+
+    def get_image_reference(self):
+        return self.image
+
+    def show_image(self):
+        self.image.show()
 
     def apply_logo(self):
         self.image.paste(self.logo, self.box, mask=self.logo.split()[3])
@@ -163,6 +173,26 @@ def image_process(image_path, logo_path, save_directory, logo_dominant_color, lo
             save_image(image, save_directory)
             break
 
+def get_one_image(image_path, logo_path, logo_dominant_color, logo_priority):
+    image = Photo(image_path, logo_path, (960,540))
+    for i in logo_priority:
+        section = image.logo_pos_index[i]()
+        if verify_compatibility(section, logo_dominant_color):
+            image.apply_logo()
+            break
+    return image.get_image_reference()
+
+def preview_images(images_paths, logo_path, logo_priority, current_photo_index):
+    try:
+        #get the photo path that need to be displayed
+        image_path = images_paths[current_photo_index]
+        logo_dominant_color = get_dominant_color(logo_path)
+
+        im = get_one_image(image_path, logo_path, logo_dominant_color, logo_priority)
+        return im
+    except:
+        print("Can't preview photo")
+
 
 def apply_logo(images_paths, logo_path, save_directory, logo_priority):
     try:
@@ -171,14 +201,11 @@ def apply_logo(images_paths, logo_path, save_directory, logo_priority):
         print("Couldn't create the directory!")
 
     logo_dominant_color = get_dominant_color(logo_path)
-    #logo_priority = [1, 2, 3, 4]
-
     arguments = [] 
     for image_path in images_paths:
         arguments.append((image_path, logo_path, save_directory, logo_dominant_color, logo_priority))
 
     cpu_count = multiprocessing.cpu_count()
-
     pool = multiprocessing.Pool(cpu_count)
     pool.starmap(image_process, arguments)
 
