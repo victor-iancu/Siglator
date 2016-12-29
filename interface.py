@@ -7,7 +7,6 @@ import cProfile
 from tkinter import filedialog, messagebox, ttk
 from os import listdir, path, chdir
 from PIL import Image, ImageTk as ImgTk
-from distutils.core import setup
 import multiprocessing
 
 
@@ -38,27 +37,29 @@ class FolderThread(threading.Thread):
 
     def run(self):
         print("Started FolderThread ")
-        #get files from directory
+        # get files from directory
         get_images(self.directory_path)
         print("Finished FolderThread ")
 
 
 class AddLogoThread(threading.Thread):
-    def __init__(self, images_paths, logo_path, save_directory, logo_priority):
+    def __init__(self, images_paths, logo_path, save_directory, logo_priority, offsets):
         threading.Thread.__init__(self)
         self.daemon = True
         self.images_paths = images_paths
         self.logo_path = logo_path
         self.save_directory = save_directory + "/SIGLATOR Results"
         self.logo_priority = logo_priority
+        self.offsets = offsets
 
     def run(self):
         print("Started AddLogoThread ")
         start_time = time.time()
         imgModule.apply_logo(self.images_paths, self.logo_path,
-                             self.save_directory, self.logo_priority )
+                             self.save_directory, self.logo_priority,
+                             self.offsets)
 
-        #cProfile
+        # cProfile
         '''
         fileName = "test.txt"
         cProfile.runctx("imgModule.test_apply_logo(img,logo,dir)", globals(),
@@ -71,28 +72,31 @@ class AddLogoThread(threading.Thread):
         '''
 
         end_time = time.time()
-        print("Duration: ",end_time - start_time)
+        print("Duration: ", end_time - start_time)
         print("Finished AddLogoThread ")
 
 
 class PreviewThread(threading.Thread):
-    def __init__(self, images_paths, logo_path, logo_priority, current_photo):
+    def __init__(self, images_paths, logo_path, logo_priority, current_photo, offsets):
         threading.Thread.__init__(self)
         self.images_paths = images_paths
         self.logo_path = logo_path
         self.logo_priority = logo_priority
         self.current_photo = current_photo
+        self.offsets = offsets
 
     def run(self):
         print("Started PreviewThread ")
         image = imgModule.preview_images(self.images_paths, self.logo_path,
-                                 self.logo_priority, self.current_photo)
+                                         self.logo_priority, self.current_photo,
+                                         self.offsets)
         gui.display_new_image(image)
         print("Finished PreviewThread ")
 
 
 class DDList(tk.Listbox):
     """ A Tkinter listbox with drag'n'drop reordering of entries. """
+
     def __init__(self, master, **kw):
         kw['selectmode'] = tk.EXTENDED
         kw['activestyle'] = tk.NONE
@@ -100,27 +104,29 @@ class DDList(tk.Listbox):
         self.bind('<Button-1>', self.setCurrent)
         self.bind('<B1-Motion>', self.shiftSelection)
         self.curIndex = None
+
     def setCurrent(self, event):
         self.curIndex = self.nearest(event.y)
+
     def shiftSelection(self, event):
         i = self.nearest(event.y)
         if i < self.curIndex:
             x = self.get(i)
             self.delete(i)
-            self.insert(i+1, x)
+            self.insert(i + 1, x)
             self.curIndex = i
         elif i > self.curIndex:
             x = self.get(i)
             self.delete(i)
-            self.insert(i-1, x)
+            self.insert(i - 1, x)
             self.curIndex = i
 
 
-class AppInterface(tk.Frame):
+class AppInterface(ttk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
 
-        #inits
+        # inits
         self.directory_path = None
         self.logo_path = None
         self.images = []
@@ -130,13 +136,16 @@ class AppInterface(tk.Frame):
                               "Top left": 4}
         self.current_photo_index = 0
         self.current_photo = None
+        self.logo_scale = tk.IntVar()
+        self.logo_horizontal_offset = tk.IntVar()
+        self.logo_vertical_offset = tk.IntVar()
 
-        #drawing the interface
+        # drawing the interface
         self.pack()
         self.create_widgets()
 
     def create_widgets(self):
-        self.directory_btn = tk.Button(self)
+        self.directory_btn = ttk.Button(self)
         self.directory_btn["text"] = "Choose a folder"
         self.directory_btn["command"] = self.open_folder
         self.directory_btn.grid(row=0, column=0, sticky=tk.W + tk.E, padx=2, pady=1)
@@ -146,7 +155,7 @@ class AppInterface(tk.Frame):
         self.directory_text.config(state=tk.DISABLED, height=1)
         self.directory_text.grid(row=0, column=1, padx=2, pady=1)
 
-        self.logo_btn = tk.Button(self)
+        self.logo_btn = ttk.Button(self)
         self.logo_btn["text"] = "Choose a logo"
         self.logo_btn["command"] = self.get_logo
         self.logo_btn.grid(row=1, column=0, sticky=tk.W + tk.E, padx=2, pady=1)
@@ -156,32 +165,70 @@ class AppInterface(tk.Frame):
         self.logo_text.config(state=tk.DISABLED, height=1)
         self.logo_text.grid(row=1, column=1, padx=2, pady=1)
 
-        self.listbox = DDList(self)
-        self.listbox.grid(row=2, column=0)
+        # logo customization Frame
+        self.logo_customize_frame = ttk.Frame(self)
+        self.logo_customize_frame.grid(row=2, columnspan=2, sticky=tk.W)
 
-        #init listbox
+        self.listbox = DDList(self.logo_customize_frame)
+        self.listbox.grid(rowspan=3, column=0)
+
+        # init listbox
         for item in ["Bottom right", "Bottom left", "Top right", "Top left"]:
             self.listbox.insert(tk.END, item)
 
-        self.add_logo_btn = tk.Button(self)
+        # default offsets
+        self.logo_scale.set(70)
+        self.logo_horizontal_offset.set(3)
+        self.logo_vertical_offset.set(3)
+
+        self.logo_scale_label = ttk.Label(self.logo_customize_frame,
+                                          text="Logo scale:")
+        self.logo_scale_label.grid(row=0, column=1)
+        self.logo_scale_scale = ttk.Scale(self.logo_customize_frame,
+                                         from_=0, to=100,
+                                         orient=tk.HORIZONTAL,
+                                         variable=self.logo_scale)
+        self.logo_scale_scale.grid(row=0, column=2)
+
+        self.logo_horizontal_offset_label = ttk.Label(self.logo_customize_frame,
+                                                      text="Horizontal offset:")
+        self.logo_horizontal_offset_label.grid(row=1, column=1)
+        self.logo_horizontal_offset_scale = ttk.Scale(self.logo_customize_frame,
+                                                       from_=0, to=100,
+                                                       orient=tk.HORIZONTAL,
+                                                       variable=self.logo_horizontal_offset)
+        self.logo_horizontal_offset_scale.grid(row=1, column=2)
+
+        self.logo_vertical_offset_label = ttk.Label(self.logo_customize_frame,
+                                                    text="Vertical offset:")
+        self.logo_vertical_offset_label.grid(row=2, column=1)
+        self.logo_vertical_offset_scale = ttk.Scale(self.logo_customize_frame,
+                                                   from_=0, to=100,
+                                                   orient=tk.HORIZONTAL,
+                                                   variable=self.logo_vertical_offset)
+        self.logo_vertical_offset_scale.grid(row=2, column=2)
+
+        # functionality buttons frame
+        self.add_logo_btn = ttk.Button(self)
         self.add_logo_btn["text"] = "Add Logo"
         self.add_logo_btn["command"] = self.add_logo
         self.add_logo_btn.grid(row=4, column=0, pady=10)
 
-        self.preview_btn = tk.Button(self)
+        self.preview_btn = ttk.Button(self)
         self.preview_btn["text"] = "Preview"
         self.preview_btn["command"] = self.preview
         self.preview_btn.grid(row=4, column=1)
 
+        # preview images frame
         self.image_preview_canvas = tk.Canvas(self, width=0, height=0)
         self.image_preview_canvas.grid(row=5, columnspan=2)
 
-        self.previous_btn = tk.Button(self)
+        self.previous_btn = ttk.Button(self)
         self.previous_btn["text"] = "Prev"
         self.previous_btn["command"] = self.previous
         self.previous_btn.grid(row=6, column=0)
 
-        self.next_btn = tk.Button(self)
+        self.next_btn = ttk.Button(self)
         self.next_btn["text"] = "Next"
         self.next_btn["command"] = self.next
         self.next_btn.grid(row=6, column=1)
@@ -191,7 +238,7 @@ class AppInterface(tk.Frame):
         if not self.directory_path:
             messagebox.showinfo("Info", "No directory chosen")
         else:
-            #display directory name
+            # display directory name
             self.directory_text.config(state=tk.NORMAL)
             self.directory_text.delete(1.0, tk.END)
             self.directory_text.insert(tk.END, self.directory_path)
@@ -204,23 +251,31 @@ class AppInterface(tk.Frame):
         if not is_image(self.logo_path):
             messagebox.showwarning("Warning", "Chosen file is not an image!")
         else:
-            #display chosen logo
+            # display chosen logo
             self.logo_text.config(state=tk.NORMAL)
             self.logo_text.delete(1.0, tk.END)
             self.logo_text.insert(tk.END, path.split(self.logo_path)[1])
             self.logo_text.config(state=tk.DISABLED)
 
     def add_logo(self):
-        logo_priority = list(map((lambda item: self.priority_dict[item]),self.listbox.get(0, tk.END)))
-        add_logo_thread = AddLogoThread(self.images, self.logo_path, self.directory_path, logo_priority)
+        logo_priority = list(map((lambda item: self.priority_dict[item]), self.listbox.get(0, tk.END)))
+        add_logo_thread = AddLogoThread(self.images, self.logo_path,
+                                        self.directory_path, logo_priority,
+                                        (self.logo_scale.get(),
+                                         self.logo_horizontal_offset.get(),
+                                         self.logo_vertical_offset.get()))
         add_logo_thread.start()
 
     def preview(self):
-        #self.image_preview_canvas.delete("all")
-        self.image_preview_canvas.create_text(480, 270, text="Loading...", font=("Purisa",50), fill="orange")
+        # self.image_preview_canvas.delete("all")
+        self.image_preview_canvas.create_text(480, 270, text="Loading...", font=("Purisa", 50), fill="orange")
 
         logo_priority = list(map((lambda item: self.priority_dict[item]), self.listbox.get(0, tk.END)))
-        preview_thread = PreviewThread(self.images, self.logo_path, logo_priority, self.current_photo_index)
+        preview_thread = PreviewThread(self.images, self.logo_path,
+                                       logo_priority, self.current_photo_index,
+                                       (self.logo_scale.get(),
+                                        self.logo_horizontal_offset.get(),
+                                        self.logo_vertical_offset.get()))
         preview_thread.start()
 
     def display_new_image(self, image):
@@ -253,6 +308,9 @@ class AppInterface(tk.Frame):
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     root = tk.Tk()
+    root.style = ttk.Style()
+    print(root.style.theme_names())
+    root.style.theme_use('xpnative')
     root.wm_title("Siglator")
     gui = AppInterface(master=root)
     gui.mainloop()
