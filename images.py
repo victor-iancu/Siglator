@@ -73,8 +73,8 @@ class Photo:
         self.section_vertical_offset = int(self.height * offsets[2] / 100)
 
         # size to scale the logo to
-        logo_scale_box = (self.width - self.section_width_scale,
-                          self.height - self.section_height_scale)
+        logo_scale_box = ( self.section_width_scale,
+                           self.section_height_scale)
 
         if (self.width, self.height, logo_scale_box) not in Photo.logo_cache:
             print("Not in cache: ", self.width, self.width, logo_scale_box)

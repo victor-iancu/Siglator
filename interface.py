@@ -1,13 +1,14 @@
 #!python3
 import images as imgModule
 import tkinter as tk
+import argparse
 import threading
 import time
+import multiprocessing
 import cProfile
 from tkinter import filedialog, messagebox, ttk
 from os import listdir, path, chdir
-from PIL import Image, ImageTk as ImgTk
-import multiprocessing
+from PIL import ImageTk as ImgTk
 
 
 def is_image(image_path):
@@ -22,11 +23,12 @@ def get_images(directory_path):
     currentFolder = chdir(directory_path)
     print("Folder path: " + directory_path)
     validImages = [".jpg", ".jpeg", ".bmp", ".png", ".gif"]
-    gui.images = []
+    images = []
     for file in listdir(currentFolder):
         ext = path.splitext(file)[1]
         if ext.lower() in validImages:
-            gui.images.append(path.abspath(file))
+            images.append(path.abspath(file))
+    return images
 
 
 class FolderThread(threading.Thread):
@@ -38,14 +40,14 @@ class FolderThread(threading.Thread):
     def run(self):
         print("Started FolderThread ")
         # get files from directory
-        get_images(self.directory_path)
+        gui.images = get_images(self.directory_path)
         print("Finished FolderThread ")
 
 
 class AddLogoThread(threading.Thread):
     def __init__(self, images_paths, logo_path, save_directory, logo_priority, offsets):
         threading.Thread.__init__(self)
-        self.daemon = True
+        #self.daemon = True
         self.images_paths = images_paths
         self.logo_path = logo_path
         self.save_directory = save_directory + "/SIGLATOR Results"
@@ -136,9 +138,9 @@ class AppInterface(ttk.Frame):
                               "Top left": 4}
         self.current_photo_index = 0
         self.current_photo = None
-        self.logo_scale = tk.IntVar()
-        self.logo_horizontal_offset = tk.IntVar()
-        self.logo_vertical_offset = tk.IntVar()
+        self.logo_scale = tk.DoubleVar()
+        self.logo_horizontal_offset = tk.DoubleVar()
+        self.logo_vertical_offset = tk.DoubleVar()
 
         # drawing the interface
         self.pack()
@@ -177,7 +179,7 @@ class AppInterface(ttk.Frame):
             self.listbox.insert(tk.END, item)
 
         # default offsets
-        self.logo_scale.set(70)
+        self.logo_scale.set(30)
         self.logo_horizontal_offset.set(3)
         self.logo_vertical_offset.set(3)
 
@@ -269,13 +271,12 @@ class AppInterface(ttk.Frame):
     def preview(self):
         # self.image_preview_canvas.delete("all")
         self.image_preview_canvas.create_text(480, 270, text="Loading...", font=("Purisa", 50), fill="orange")
-
         logo_priority = list(map((lambda item: self.priority_dict[item]), self.listbox.get(0, tk.END)))
         preview_thread = PreviewThread(self.images, self.logo_path,
                                        logo_priority, self.current_photo_index,
-                                       (self.logo_scale.get(),
-                                        self.logo_horizontal_offset.get(),
-                                        self.logo_vertical_offset.get()))
+                                       (int(round(self.logo_scale.get())),
+                                        int(round(self.logo_horizontal_offset.get())),
+                                        int(round(self.logo_vertical_offset.get()))))
         preview_thread.start()
 
     def display_new_image(self, image):
@@ -305,12 +306,81 @@ class AppInterface(ttk.Frame):
             print("Can't get next photo")
 
 
+def get_parser():
+    parser = argparse.ArgumentParser(description='add logos to photos',
+                                     formatter_class=argparse.RawTextHelpFormatter)
+
+    parser.add_argument('--directory', '-D',
+                        help='path to the directory')
+
+    parser.add_argument('--logo', '-L',
+                        help="path to the logo")
+
+    parser.add_argument('--priority', '-P', nargs=4, type=int,
+                        help=
+'''
+logo's position (corner) priority
+4 integers (1-4); each representing a corner:
+1 - bottom-right
+2 - bottom-left
+3 - top-right
+4 - top-left
+default: (1,2,3,4)
+'''
+                        )
+
+    parser.add_argument('--scale', '-S', nargs=3, type=int,
+                        help=
+'''
+logo's scale and position (offsets)
+3 integers, each representing a percentage(0-100):
+first integer: logo's scale
+second integer: logo's horizontal offset
+third integer: logo's vertical offset
+default: (30, 3, 3)
+'''
+                        )
+    return parser
+
+def command_line(args):
+
+    try:
+        directory_path = args.directory
+        images_paths = get_images(directory_path)
+        logo_path = args.logo
+
+        if not args.scale:
+            offsets = (30, 3, 3) # default
+        else:
+            offsets = args.scale
+
+        if not args.priority:
+            logo_priority = (1, 2, 3, 4) # default
+        else:
+            logo_priority = args.priority
+
+        add_logo_thread = AddLogoThread(images_paths, logo_path,
+                                    directory_path, logo_priority,
+                                    offsets)
+        add_logo_thread.start()
+    except:
+        print("Not enough arguments")
+
+
 if __name__ == "__main__":
+    # build support for processes
     multiprocessing.freeze_support()
-    root = tk.Tk()
-    root.style = ttk.Style()
-    print(root.style.theme_names())
-    root.style.theme_use('xpnative')
-    root.wm_title("Siglator")
-    gui = AppInterface(master=root)
-    gui.mainloop()
+
+    parser = get_parser()
+    args = parser.parse_args()
+
+    if args.directory and args.logo:
+        command_line(args)
+    else:
+        # gui
+        root = tk.Tk()
+        root.style = ttk.Style()
+        root.style.theme_use('xpnative')
+        root.wm_title("Siglator")
+        gui = AppInterface(master=root)
+        gui.mainloop()
