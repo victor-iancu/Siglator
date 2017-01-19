@@ -23,4 +23,7 @@
 1. Select the folder which contains the images. Press "Choose a folder" button.
 2. Select the logo to be applied on all images. Press "Choose a logo" button.
 3. Select whether to "Preview" or "Save" the images. Default is "Preview".
-3. Apply the logo. Press "Add Logo" button.
+4. Apply the logo. Press "Add Logo" button.
+
+###Distribution:
+1. Build using PyInstaller: "pyinstaller interface.py --noconsole"
