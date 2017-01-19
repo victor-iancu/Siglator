@@ -1,10 +1,31 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from os import listdir, path, chdir, makedirs
 from PIL import Image, ImageTk as ImgTk
 from colorthief import ColorThief
 from io import BytesIO
 
+class Photo(Image):
+
+    def __init__(self, path):
+        super.__init__(self)
+        self.image = Image.open(path)
+
+    def get_dominant_color (self, image):
+        color_thief = ColorThief(image)
+        return color_thief.get_color(quality=10)
+
+    def get_bottom_right_corner(self,):
+        print("BR")
+
+    def get_bottom_left_corner(self):
+        print("BL")
+
+    def get_top_right_corner(self):
+        print("TR")
+
+    def get_top_left_corner(self):
+        print("TL")
 
 class AppInterface(tk.Frame):
     def __init__(self, master=None):
@@ -93,8 +114,10 @@ class AppInterface(tk.Frame):
                 pass
 
     def add_logo(self):
-
         self.get_images()
+        self.progress_bar = ttk.Progressbar(self, maximum=len(self.images))
+        #print(self.progress_bar["length"])
+        self.progress_bar.grid(row=6, columnspan=2, stick=tk.W+tk.E)
         self.process_images()
 
     def unlock_and_preview(self):
@@ -327,10 +350,13 @@ class AppInterface(tk.Frame):
 
             for image in self.images:
                 # open the current image
-                position_corner = 1
+
                 im = Image.open(image)
 
                 im = self.paste_logo(im)
+
+                self.progress_bar.step()
+                self.progress_bar.update()
 
                 if self.radio_var.get() == 1:
                     im.show()
@@ -339,8 +365,12 @@ class AppInterface(tk.Frame):
                     photo_path = new_dir_path + "/" + path.split(image)[1]
                     im.save(photo_path)
 
+
         else:
             messagebox.showinfo("Info", "No photos found in the selected directory!")
+
+#class MyImage():
+ #   def __init__(self):
 
 
 def main():

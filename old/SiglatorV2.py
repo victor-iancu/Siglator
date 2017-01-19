@@ -78,12 +78,10 @@ def verify_compatibility(section, accuracy=5):
 
         try:
             temp_section_dominant_color = get_dominant_color(bytesIO)
-            #print("CT Spot dominant color: ", temp_section_dominant_color)
             if not verify_color(temp_section_dominant_color):
                 return False
         except:
-            pass
-
+            return False
         bytesIO.close()
     return True
 
