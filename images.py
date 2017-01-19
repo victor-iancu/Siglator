@@ -1,4 +1,5 @@
 import multiprocessing
+import threading
 from PIL import Image, ImageTk as ImgTk
 from colorthief import ColorThief
 from io import BytesIO
@@ -77,7 +78,7 @@ class Photo:
                            self.section_height_scale)
 
         if (self.width, self.height, logo_scale_box) not in Photo.logo_cache:
-            print("Not in cache: ", self.width, self.width, logo_scale_box)
+            #print("Not in cache: ", self.width, self.width, logo_scale_box)
             self.logo = Image.open(logo_path)
 
             # scale logo
@@ -86,7 +87,7 @@ class Photo:
             # add to cache
             Photo.logo_cache.update({(self.width, self.height, logo_scale_box): self.logo})
         else:
-            print("In cache: ", self.width, self.height, logo_scale_box)
+            #print("In cache: ", self.width, self.height, logo_scale_box)
             # retrieve from cache
             self.logo = Photo.logo_cache[(self.width, self.height, logo_scale_box)]
 
@@ -162,17 +163,21 @@ def save_image(img, save_directory):
     img.image.save(save_directory + '/' + path.split(img.image_path)[1])
 
 
-def image_process(image_path, logo_path, save_directory, logo_dominant_color, logo_priority, offsets):
+def image_process(image_path, logo_path, save_directory,
+                  logo_dominant_color, logo_priority, offsets, queue):
+
     image = Photo(image_path, logo_path, offsets)
     for i in logo_priority:
         section = image.logo_pos_index[i]()
         if verify_compatibility(section, logo_dominant_color):
             image.apply_logo()
             save_image(image, save_directory)
+            queue.put_nowait(image_path)
             break
 
 
-def preview_images(images_paths, logo_path, logo_priority, current_photo_index, offsets):
+def preview_images(images_paths, logo_path, logo_priority,
+                   current_photo_index, offsets):
     try:
         # get the photo to the path that will be displayed
         image_path = images_paths[current_photo_index]
@@ -189,7 +194,8 @@ def preview_images(images_paths, logo_path, logo_priority, current_photo_index, 
         print("Can't preview photo")
 
 
-def apply_logo(images_paths, logo_path, save_directory, logo_priority, offsets):
+def apply_logo(images_paths, logo_path, save_directory,
+               logo_priority, offsets, pbar_queue):
     try:
         makedirs(save_directory, exist_ok=True)
     except:
@@ -199,7 +205,7 @@ def apply_logo(images_paths, logo_path, save_directory, logo_priority, offsets):
     arguments = []
     for image_path in images_paths:
         arguments.append((image_path, logo_path, save_directory,
-                          logo_dominant_color, logo_priority, offsets))
+                          logo_dominant_color, logo_priority, offsets, pbar_queue))
 
     cpu_count = multiprocessing.cpu_count()
     pool = multiprocessing.Pool(cpu_count)
@@ -218,3 +224,5 @@ def test_apply_logo(images_paths, logo_path, save_directory):
 
     for image_path in images_paths:
         image_process(image_path, logo_path, save_directory, logo_dominant_color, logo_priority)
+
+

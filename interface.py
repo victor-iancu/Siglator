@@ -5,6 +5,7 @@ import argparse
 import threading
 import time
 import multiprocessing
+import sys
 import cProfile
 from tkinter import filedialog, messagebox, ttk
 from os import listdir, path, chdir
@@ -44,8 +45,37 @@ class FolderThread(threading.Thread):
         print("Finished FolderThread ")
 
 
+class ProgressThread(threading.Thread):
+    def __init__(self, id, progressbar_queue, length=0):
+        threading.Thread.__init__(self)
+        self.id = id
+        self.progressbar_queue = progressbar_queue
+        self.length = length
+
+    def run(self):
+        print("Started ProgressThread ")
+        if self.id == "GUI":
+            progress_func = gui.update_progress_bar
+        else:
+            progress_func = progress_bar_cmd
+
+        count = 0
+
+        while True:
+            try:
+                x = self.progressbar_queue.get(True)
+                if x == "DONE":
+                    break
+                count += 1
+                progress_func(count, self.length)
+            except:
+                pass
+        print("Finished ProgressThread ")
+
+
 class AddLogoThread(threading.Thread):
-    def __init__(self, images_paths, logo_path, save_directory, logo_priority, offsets):
+    def __init__(self, images_paths, logo_path, save_directory,
+                 logo_priority, offsets, progress_queue):
         threading.Thread.__init__(self)
         #self.daemon = True
         self.images_paths = images_paths
@@ -53,14 +83,16 @@ class AddLogoThread(threading.Thread):
         self.save_directory = save_directory + "/SIGLATOR Results"
         self.logo_priority = logo_priority
         self.offsets = offsets
+        self.progress_queue = progress_queue
 
     def run(self):
         print("Started AddLogoThread ")
         start_time = time.time()
+
         imgModule.apply_logo(self.images_paths, self.logo_path,
                              self.save_directory, self.logo_priority,
-                             self.offsets)
-
+                             self.offsets, self.progress_queue)
+        self.progress_queue.put_nowait("DONE")
         # cProfile
         '''
         fileName = "test.txt"
@@ -72,8 +104,13 @@ class AddLogoThread(threading.Thread):
                         },
                         fileName)
         '''
+        try:
+            gui.progress_bar.grid_forget()
+        except:
+            pass
 
         end_time = time.time()
+        print()
         print("Duration: ", end_time - start_time)
         print("Finished AddLogoThread ")
 
@@ -141,6 +178,8 @@ class AppInterface(ttk.Frame):
         self.logo_scale = tk.DoubleVar()
         self.logo_horizontal_offset = tk.DoubleVar()
         self.logo_vertical_offset = tk.DoubleVar()
+        self.progress_bar = None
+        self.progress_bar_value = tk.IntVar()
 
         # drawing the interface
         self.pack()
@@ -261,12 +300,21 @@ class AppInterface(ttk.Frame):
 
     def add_logo(self):
         logo_priority = list(map((lambda item: self.priority_dict[item]), self.listbox.get(0, tk.END)))
+
+        self.progress_bar = ttk.Progressbar(self, maximum=len(self.images))
+        self.progress_bar.grid(row=7, columnspan=2, stick=tk.W + tk.E)
+
+        process_manager = multiprocessing.Manager()
+        pbar_queue = process_manager.Queue()
+        progress_thread = ProgressThread("GUI", pbar_queue)
         add_logo_thread = AddLogoThread(self.images, self.logo_path,
                                         self.directory_path, logo_priority,
                                         (self.logo_scale.get(),
                                          self.logo_horizontal_offset.get(),
-                                         self.logo_vertical_offset.get()))
+                                         self.logo_vertical_offset.get()),
+                                        pbar_queue)
         add_logo_thread.start()
+        progress_thread.start()
 
     def preview(self):
         # self.image_preview_canvas.delete("all")
@@ -304,6 +352,10 @@ class AppInterface(ttk.Frame):
             self.preview()
         except:
             print("Can't get next photo")
+
+    def update_progress_bar(self, *args):
+        self.progress_bar.step()
+        self.progress_bar.update()
 
 
 def get_parser():
@@ -359,12 +411,28 @@ def command_line(args):
         else:
             logo_priority = args.priority
 
+        process_manager = multiprocessing.Manager()
+        progressbar_queue = process_manager.Queue()
+        progress_thread = ProgressThread("CMD", progressbar_queue, len(images_paths))
+
         add_logo_thread = AddLogoThread(images_paths, logo_path,
                                     directory_path, logo_priority,
-                                    offsets)
+                                    offsets, progressbar_queue)
         add_logo_thread.start()
+        progress_thread.start()
     except:
         print("Not enough arguments")
+
+
+def progress_bar_cmd(count, total, suffix=''):
+    bar_len = 60
+    filled_len = int(round(bar_len * count / float(total)))
+
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', suffix))
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":
